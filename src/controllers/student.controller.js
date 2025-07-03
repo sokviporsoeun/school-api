@@ -22,14 +22,54 @@ export const createStudent = async (req, res) => {
  *   get:
  *     summary: Get all students
  *     tags: [Students]
+ *     parameters: 
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
+ *         description: Number of students per page
+ *       - in: query
+ *         name: sort
+ *         schema: { type: string, enum: [asc, desc], default: asc }
+ *         description: Sort by created time
+ *       - in: query
+ *         name: populate
+ *         schema: { type: string, enum: [courses] }
+ *         description: Populate enrolled courses
  *     responses:
  *       200:
  *         description: List of students
  */
 export const getAllStudents = async (req, res) => {
+    const limit = parseInt(req.query.limit) || 10;
+    const page = parseInt(req.query.page) || 1;
+    const sort = req.query.sort === 'desc' ? 'DESC' : 'ASC';
+    const offset = (page - 1) * limit;
+
+    const include = [];
+    if (req.query.populate === 'courses') {
+        include.push({ model: db.Course });
+    }
     try {
-        const students = await db.Student.findAll({ include: db.Course });
-        res.json(students);
+        const total = await db.Student.count();
+        const students = await db.Student.findAll({ 
+        limit,
+        offset,
+        order: [['createdAt', sort]],
+        include,
+    });
+        res.json({
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+            data: students, });
+
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
